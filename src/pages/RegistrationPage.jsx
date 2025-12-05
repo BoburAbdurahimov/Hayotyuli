@@ -1,20 +1,203 @@
 // src/pages/RegistrationPage.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useStore from '../store';
 import { translations } from '../i18n/translations';
 
 const RegistrationPage = () => {
-  const { formData, setFormData, completeRegistration, language } = useStore();
+  const { formData, setFormData, language } = useStore();
   const navigate = useNavigate();
   const t = translations[language];
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (completeRegistration()) {
-      navigate('/subjects');
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+
+  // Validation functions
+  const validateName = (value) => {
+    if (!value.trim()) return language === 'uz' ? 'Bu maydon to\'ldirilishi shart' : 'Это поле обязательно';
+    if (value.length < 2) return language === 'uz' ? 'Kamida 2 ta harf bo\'lishi kerak' : 'Минимум 2 буквы';
+    if (!/^[a-zA-Zа-яА-ЯёЁўЎқҚғҒҳҲ\s'-]+$/.test(value)) {
+      return language === 'uz' ? 'Faqat harflar kiritilishi mumkin' : 'Только буквы';
+    }
+    return '';
+  };
+
+  const validatePhone = (value, required = false) => {
+    if (!required && !value) return '';
+    if (!value.trim()) return language === 'uz' ? 'Bu maydon to\'ldirilishi shart' : 'Это поле обязательно';
+
+    // Remove all non-digits
+    const cleaned = value.replace(/\D/g, '');
+
+    // Check if it's a valid Uzbek number (starts with 998 and has correct length)
+    if (!/^998\d{9}$/.test(cleaned)) {
+      return language === 'uz'
+        ? 'To\'g\'ri telefon raqam kiriting (+998 XX XXX-XX-XX)'
+        : 'Введите правильный номер телефона (+998 XX XXX-XX-XX)';
+    }
+    return '';
+  };
+
+  const validateRegion = (value) => {
+    if (!value.trim()) return language === 'uz' ? 'Bu maydon to\'ldirilishi shart' : 'Это поле обязательно';
+    if (value.length < 3) return language === 'uz' ? 'Kamida 3 ta harf bo\'lishi kerak' : 'Минимум 3 буквы';
+    return '';
+  };
+
+  const validateSchoolNumber = (value) => {
+    if (!value.trim()) return language === 'uz' ? 'Bu maydon to\'ldirilishi shart' : 'Это поле обязательно';
+    if (value.length < 1) return language === 'uz' ? 'Maktab raqamini kiriting' : 'Введите номер школы';
+    return '';
+  };
+
+  const validateQuestion = (value, questionNum) => {
+    if (!value.trim()) return language === 'uz' ? 'Bu savolga javob bering' : 'Ответьте на этот вопрос';
+    if (value.length < 3) {
+      return language === 'uz'
+        ? 'Kamida 3 ta belgi bo\'lishi kerak'
+        : 'Минимум 3 символа';
+    }
+    if (value.length > 500) {
+      return language === 'uz'
+        ? 'Maksimum 500 ta belgi'
+        : 'Максимум 500 символов';
+    }
+    return '';
+  };
+
+  const validateLanguageLevel = (value, fieldName) => {
+    // Language levels are optional, no validation needed
+    return '';
+  };
+
+  // Handle field blur (when user leaves the field)
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    validateField(field, formData[field]);
+  };
+
+  // Validate individual field
+  const validateField = (field, value) => {
+    let error = '';
+
+    switch (field) {
+      case 'first_name':
+      case 'last_name':
+      case 'father_name':
+      case 'mother_name':
+        error = validateName(value);
+        break;
+      case 'phone':
+        error = validatePhone(value, false); // Phone is optional
+        break;
+      case 'father_phone':
+      case 'mother_phone':
+        error = validatePhone(value, false); // Parent phones are optional
+        break;
+      case 'region':
+        error = validateRegion(value);
+        break;
+      case 'district':
+        // District is optional
+        break;
+      case 'school_number':
+        error = validateSchoolNumber(value);
+        break;
+      case 'q1':
+      case 'q2':
+      case 'q3':
+      case 'q4':
+      case 'q5':
+      case 'q6':
+        error = validateQuestion(value, field);
+        break;
+      default:
+        break;
+    }
+
+    setErrors(prev => ({ ...prev, [field]: error }));
+    return error;
+  };
+
+  // Handle input change with validation
+  const handleChange = (field, value) => {
+    setFormData(field, value);
+    if (touched[field]) {
+      validateField(field, value);
     }
   };
+
+  // Format phone number as user types
+  const formatPhoneNumber = (value) => {
+    const cleaned = value.replace(/\D/g, '');
+    let formatted = '';
+
+    if (cleaned.startsWith('998')) {
+      formatted = '+998';
+      if (cleaned.length > 3) formatted += ' ' + cleaned.substring(3, 5);
+      if (cleaned.length > 5) formatted += ' ' + cleaned.substring(5, 8);
+      if (cleaned.length > 8) formatted += '-' + cleaned.substring(8, 10);
+      if (cleaned.length > 10) formatted += '-' + cleaned.substring(10, 12);
+    } else if (cleaned.length > 0) {
+      formatted = '+998 ' + cleaned.substring(0, 2);
+      if (cleaned.length > 2) formatted += ' ' + cleaned.substring(2, 5);
+      if (cleaned.length > 5) formatted += '-' + cleaned.substring(5, 7);
+      if (cleaned.length > 7) formatted += '-' + cleaned.substring(7, 9);
+    } else {
+      formatted = value;
+    }
+
+    return formatted;
+  };
+
+  const handlePhoneChange = (field, value) => {
+    const formatted = formatPhoneNumber(value);
+    setFormData(field, formatted);
+    if (touched[field]) {
+      validateField(field, formatted);
+    }
+  };
+
+  // Validate all fields
+  const validateAllFields = () => {
+    const newErrors = {};
+    const requiredFields = [
+      'first_name', 'last_name', 'region', 'school_number',
+      'q1', 'q2', 'q3', 'q4', 'q5', 'q6'
+    ];
+
+    requiredFields.forEach(field => {
+      const error = validateField(field, formData[field]);
+      if (error) newErrors[field] = error;
+    });
+
+    // Mark all required fields as touched
+    const newTouched = {};
+    requiredFields.forEach(field => {
+      newTouched[field] = true;
+    });
+    setTouched(prev => ({ ...prev, ...newTouched }));
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    if (validateAllFields()) {
+      navigate('/subjects');
+    } else {
+      // Scroll to first error
+      const firstError = document.querySelector('.border-red-300');
+      if (firstError) {
+        firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  };
+
+  // Helper to get error message
+  const getError = (field) => touched[field] && errors[field] ? errors[field] : '';
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -35,25 +218,39 @@ const RegistrationPage = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block font-medium text-gray-700 mb-2">{t.firstName} {t.required}</label>
+                <label className="block font-medium text-gray-700 mb-2">
+                  {t.firstName} <span className="text-red-500">{t.required}</span>
+                </label>
                 <input
                   type="text"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${getError('first_name') ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
                   value={formData.first_name}
-                  onChange={(e) => setFormData('first_name', e.target.value)}
-                  required
+                  onChange={(e) => handleChange('first_name', e.target.value)}
+                  onBlur={() => handleBlur('first_name')}
+                  placeholder={language === 'uz' ? 'Ismingizni kiriting' : 'Введите ваше имя'}
                 />
+                {getError('first_name') && (
+                  <p className="mt-1 text-sm text-red-600">{getError('first_name')}</p>
+                )}
               </div>
 
               <div>
-                <label className="block font-medium text-gray-700 mb-2">{t.lastName} {t.required}</label>
+                <label className="block font-medium text-gray-700 mb-2">
+                  {t.lastName} <span className="text-red-500">{t.required}</span>
+                </label>
                 <input
                   type="text"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${getError('last_name') ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
                   value={formData.last_name}
-                  onChange={(e) => setFormData('last_name', e.target.value)}
-                  required
+                  onChange={(e) => handleChange('last_name', e.target.value)}
+                  onBlur={() => handleBlur('last_name')}
+                  placeholder={language === 'uz' ? 'Familiyangizni kiriting' : 'Введите вашу фамилию'}
                 />
+                {getError('last_name') && (
+                  <p className="mt-1 text-sm text-red-600">{getError('last_name')}</p>
+                )}
               </div>
 
               <div>
@@ -61,42 +258,62 @@ const RegistrationPage = () => {
                 <input
                   type="tel"
                   placeholder={t.phonePlaceholder}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${getError('phone') ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
                   value={formData.phone}
-                  onChange={(e) => setFormData('phone', e.target.value)}
+                  onChange={(e) => handlePhoneChange('phone', e.target.value)}
+                  onBlur={() => handleBlur('phone')}
                 />
+                {getError('phone') && (
+                  <p className="mt-1 text-sm text-red-600">{getError('phone')}</p>
+                )}
               </div>
 
               <div>
-                <label className="block font-medium text-gray-700 mb-2">{t.region} {t.required}</label>
+                <label className="block font-medium text-gray-700 mb-2">
+                  {t.region} <span className="text-red-500">{t.required}</span>
+                </label>
                 <input
                   type="text"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${getError('region') ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
                   value={formData.region}
-                  onChange={(e) => setFormData('region', e.target.value)}
-                  required
+                  onChange={(e) => handleChange('region', e.target.value)}
+                  onBlur={() => handleBlur('region')}
+                  placeholder={language === 'uz' ? 'Viloyatingizni kiriting' : 'Введите вашу область'}
                 />
+                {getError('region') && (
+                  <p className="mt-1 text-sm text-red-600">{getError('region')}</p>
+                )}
               </div>
 
               <div>
                 <label className="block font-medium text-gray-700 mb-2">{t.district}</label>
                 <input
                   type="text"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                   value={formData.district}
-                  onChange={(e) => setFormData('district', e.target.value)}
+                  onChange={(e) => handleChange('district', e.target.value)}
+                  placeholder={language === 'uz' ? 'Tumaningizni kiriting' : 'Введите ваш район'}
                 />
               </div>
 
               <div>
-                <label className="block font-medium text-gray-700 mb-2">{t.schoolNumber} {t.required}</label>
+                <label className="block font-medium text-gray-700 mb-2">
+                  {t.schoolNumber} <span className="text-red-500">{t.required}</span>
+                </label>
                 <input
                   type="text"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${getError('school_number') ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
                   value={formData.school_number}
-                  onChange={(e) => setFormData('school_number', e.target.value)}
-                  required
+                  onChange={(e) => handleChange('school_number', e.target.value)}
+                  onBlur={() => handleBlur('school_number')}
+                  placeholder={language === 'uz' ? 'Raqamni kiriting' : 'Введите номер'}
                 />
+                {getError('school_number') && (
+                  <p className="mt-1 text-sm text-red-600">{getError('school_number')}</p>
+                )}
               </div>
             </div>
           </div>
@@ -110,10 +327,16 @@ const RegistrationPage = () => {
                 <label className="block font-medium text-gray-700 mb-2">{t.fatherName}</label>
                 <input
                   type="text"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${getError('father_name') ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
                   value={formData.father_name}
-                  onChange={(e) => setFormData('father_name', e.target.value)}
+                  onChange={(e) => handleChange('father_name', e.target.value)}
+                  onBlur={() => handleBlur('father_name')}
+                  placeholder={language === 'uz' ? 'Otangizning ismini kiriting' : 'Введите имя отца'}
                 />
+                {getError('father_name') && (
+                  <p className="mt-1 text-sm text-red-600">{getError('father_name')}</p>
+                )}
               </div>
 
               <div>
@@ -121,20 +344,31 @@ const RegistrationPage = () => {
                 <input
                   type="tel"
                   placeholder={t.phonePlaceholder}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${getError('father_phone') ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
                   value={formData.father_phone}
-                  onChange={(e) => setFormData('father_phone', e.target.value)}
+                  onChange={(e) => handlePhoneChange('father_phone', e.target.value)}
+                  onBlur={() => handleBlur('father_phone')}
                 />
+                {getError('father_phone') && (
+                  <p className="mt-1 text-sm text-red-600">{getError('father_phone')}</p>
+                )}
               </div>
 
               <div>
                 <label className="block font-medium text-gray-700 mb-2">{t.motherName}</label>
                 <input
                   type="text"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${getError('mother_name') ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
                   value={formData.mother_name}
-                  onChange={(e) => setFormData('mother_name', e.target.value)}
+                  onChange={(e) => handleChange('mother_name', e.target.value)}
+                  onBlur={() => handleBlur('mother_name')}
+                  placeholder={language === 'uz' ? 'Onangizning ismini kiriting' : 'Введите имя матери'}
                 />
+                {getError('mother_name') && (
+                  <p className="mt-1 text-sm text-red-600">{getError('mother_name')}</p>
+                )}
               </div>
 
               <div>
@@ -142,10 +376,15 @@ const RegistrationPage = () => {
                 <input
                   type="tel"
                   placeholder={t.phonePlaceholder}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${getError('mother_phone') ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
                   value={formData.mother_phone}
-                  onChange={(e) => setFormData('mother_phone', e.target.value)}
+                  onChange={(e) => handlePhoneChange('mother_phone', e.target.value)}
+                  onBlur={() => handleBlur('mother_phone')}
                 />
+                {getError('mother_phone') && (
+                  <p className="mt-1 text-sm text-red-600">{getError('mother_phone')}</p>
+                )}
               </div>
             </div>
           </div>
@@ -153,20 +392,31 @@ const RegistrationPage = () => {
           {/* Questions Section */}
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-gray-800">{t.surveyTitle}</h2>
-            <p className="text-gray-600 italic">{t.surveySubtitle} {t.required}</p>
+            <p className="text-gray-600 italic">{t.surveySubtitle} <span className="text-red-500">{t.required}</span></p>
 
             {[1, 2, 3, 4, 5, 6].map((num) => (
               <div key={num} className="space-y-2">
                 <label className="block font-medium text-gray-700">
-                  {num}. {t[`question${num}`]} {t.required}
+                  {num}. {t[`question${num}`]} <span className="text-red-500">{t.required}</span>
                 </label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                <textarea
+                  rows="3"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition resize-none ${getError(`q${num}`) ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
                   value={formData[`q${num}`]}
-                  onChange={(e) => setFormData(`q${num}`, e.target.value)}
-                  required
+                  onChange={(e) => handleChange(`q${num}`, e.target.value)}
+                  onBlur={() => handleBlur(`q${num}`)}
+                  placeholder={language === 'uz' ? 'Javobingizni yozing...' : 'Напишите ваш ответ...'}
+                  maxLength="500"
                 />
+                <div className="flex justify-between items-center">
+                  {getError(`q${num}`) && (
+                    <p className="text-sm text-red-600">{getError(`q${num}`)}</p>
+                  )}
+                  <p className="text-sm text-gray-500 ml-auto">
+                    {formData[`q${num}`]?.length || 0}/500
+                  </p>
+                </div>
               </div>
             ))}
           </div>
@@ -212,7 +462,7 @@ const RegistrationPage = () => {
               {t.nextToSubjects}
             </button>
             <p className="text-gray-600 text-sm mt-4">
-              {t.required} {t.requiredNote}
+              <span className="text-red-500">{t.required}</span> {t.requiredNote}
             </p>
           </div>
         </form>
