@@ -50,6 +50,7 @@ function doPost(e) {
                 'Total Questions',
                 'Score Percentage',
                 'Test Completed',
+                'Special Code',
                 'Test Answers'
             ];
 
@@ -87,6 +88,7 @@ function doPost(e) {
             data.totalQuestions || 0,
             data.scorePercentage || 0,
             data.testCompleted ? 'Yes' : 'No',
+            data.special_code || '',
             data.testAnswers || ''
         ];
 
@@ -140,6 +142,7 @@ function testDoPost() {
                 totalQuestions: 30,
                 scorePercentage: 83,
                 testCompleted: true,
+                special_code: 'HYTEST-1234',
                 testAnswers: '{}'
             })
         }

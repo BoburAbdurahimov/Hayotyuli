@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useStore from '../store';
-import { submitToGoogleSheets, formatQuizData } from '../utils/googleSheets';
+import { submitToGoogleSheets, formatQuizData, generateSpecialCode } from '../utils/googleSheets';
 
 const TestPage = () => {
   const navigate = useNavigate();
@@ -12,6 +12,7 @@ const TestPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState(null);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
+  const [specialCode, setSpecialCode] = useState(null);
 
   // Initialize test session when component mounts
   useEffect(() => {
@@ -55,12 +56,16 @@ const TestPage = () => {
     setSubmissionError(null);
 
     try {
+      // Generate unique special code
+      const code = generateSpecialCode();
+      setSpecialCode(code);
+
       // Format and submit data to Google Sheets
       const dataToSubmit = formatQuizData(formData, selectedSubjects, {
         ...testSession,
         answers,
         completed: true,
-      });
+      }, code);
 
       await submitToGoogleSheets(dataToSubmit);
 
@@ -113,6 +118,25 @@ const TestPage = () => {
               </div>
             )}
           </div>
+
+          {/* Special Code Display */}
+          {specialCode && (
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl p-8 mb-8 text-white shadow-xl">
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z" clipRule="evenodd" />
+                  </svg>
+                  <h2 className="text-2xl font-bold">Maxsus Kod</h2>
+                </div>
+                <p className="text-white/90 mb-4">Telegram botda natijalaringizni tekshirish uchun bu kodni kiriting</p>
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-6 border-2 border-white/30">
+                  <p className="text-4xl font-mono font-bold tracking-wider">{specialCode}</p>
+                </div>
+                <p className="text-sm text-white/80 mt-4">⚠️ Ushbu kodni saqlab qo'ying!</p>
+              </div>
+            </div>
+          )}
 
           <div className="bg-blue-50 rounded-lg p-6 mb-8">
             <h2 className="text-xl font-semibold text-blue-900 mb-6 text-center">Ma'lumotlaringiz</h2>
@@ -271,8 +295,8 @@ const TestPage = () => {
                 onClick={handleSubmit}
                 disabled={isSubmitting}
                 className={`px-8 py-3 rounded-lg font-medium shadow-md flex items-center gap-2 ${isSubmitting
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-green-600 hover:bg-green-700 text-white'
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
                   }`}
               >
                 {isSubmitting ? (

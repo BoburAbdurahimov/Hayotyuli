@@ -1,6 +1,21 @@
 // src/utils/googleSheets.js
 
 /**
+ * Generate a unique special code for checking test results
+ * Format: HYXXXX-YYYY (HY = Hayot Yuli, XXXX = random alphanumeric, YYYY = timestamp)
+ * @returns {string} Special code
+ */
+export function generateSpecialCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let randomPart = '';
+    for (let i = 0; i < 4; i++) {
+        randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const timePart = Date.now().toString().slice(-4);
+    return `HY${randomPart}-${timePart}`;
+}
+
+/**
  * Submit data to Google Sheets via Google Apps Script Web App
  * @param {Object} data - The data to submit
  * @returns {Promise<Object>} Response from Google Sheets
@@ -60,9 +75,10 @@ export function calculateScore(testSession) {
  * @param {Object} formData - User registration data
  * @param {Array} selectedSubjects - Selected subjects
  * @param {Object} testSession - Test session with answers
+ * @param {string} specialCode - Unique special code for checking results
  * @returns {Object} Formatted data object
  */
-export function formatQuizData(formData, selectedSubjects, testSession) {
+export function formatQuizData(formData, selectedSubjects, testSession, specialCode) {
     const scoreData = calculateScore(testSession);
 
     return {
@@ -101,6 +117,9 @@ export function formatQuizData(formData, selectedSubjects, testSession) {
         score: scoreData.score,
         totalQuestions: scoreData.total,
         scorePercentage: scoreData.percentage,
+
+        // Special code for result checking
+        special_code: specialCode,
 
         // Timestamp
         timestamp: new Date().toISOString(),
